@@ -1,0 +1,20 @@
+preprocess:
+  input : s3://m1-2026-mlops-project-group1/data/raw/data.csv
+  output : s3://m1-2026-mlops-project-group1/data/processed/data_processed.csv
+
+train : 
+  data: s3://m1-2026-mlops-project-group1/data/processed/data_processed.csv
+  model_path : models/model.pkl
+
+evaluate :
+  model_path : models/model.pkl
+  data_path : s3://m1-2026-mlops-project-group1/data/processed/data_processed.csv
+
+aws :
+  aws_access_key_id: ASIA4NLUC36ZSSDISMRU
+  aws_secret_access_key: Rmw4RYfv0jNW+wbFYTqbC2YXCAZgN8BI2ClSdYRd
+  region_name: ap-northeast-1
+
+mlflow:
+  MLFLOW_TRACKING_URI: "http://52.196.234.98:5000"
+  EXPERIMENT_NAME: "Student_Experiment"
