@@ -4,17 +4,21 @@ et fournit un formulaire de prédiction.
 import os
 import sys
 
+import joblib
 import mlflow
 import pandas as pd
 from flask import Flask, render_template, request
 
 # Permet d'importer src.utils quand on lance depuis n'importe où
-sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+PROJECT_ROOT = os.path.join(os.path.dirname(__file__), "..")
+sys.path.append(PROJECT_ROOT)
 from src.utils import load_config  # noqa: E402
 
 config = load_config()
 mlflow.set_tracking_uri(config["mlflow"]["MLFLOW_TRACKING_URI"])
 MODEL_NAME = config["mlflow"]["REGISTERED_MODEL_NAME"]
+# Modèle local de secours (utilisé si le Registry MLflow est indisponible).
+LOCAL_MODEL_PATH = os.path.join(PROJECT_ROOT, config["train"]["model_path"])
 
 # Les features du dataset Diabetes (à adapter à ton dataset)
 FEATURES = [
@@ -27,17 +31,34 @@ _model = None
 
 
 def get_model():
-    """Charge (et met en cache) le dernier modèle 'champion' du Registry."""
+    """Charge (et met en cache) le modèle.
+
+    Ordre de priorité :
+      1. Alias 'champion' du MLflow Model Registry
+      2. Dernière version enregistrée dans le Registry
+      3. Modèle local models/model.pkl (secours si le Registry est vide/indisponible)
+    """
     global _model
     if _model is None:
-        # Essaie l'alias 'champion', sinon la dernière version.
-        try:
-            uri = f"models:/{MODEL_NAME}@champion"
-            _model = mlflow.pyfunc.load_model(uri)
-        except Exception:
-            uri = f"models:/{MODEL_NAME}/latest"
-            _model = mlflow.pyfunc.load_model(uri)
-        print(f"[app] Modele charge depuis : {uri}")
+        for uri in (f"models:/{MODEL_NAME}@champion", f"models:/{MODEL_NAME}/latest"):
+            try:
+                _model = mlflow.pyfunc.load_model(uri)
+                print(f"[app] Modele charge depuis le Registry : {uri}")
+                return _model
+            except Exception as e:
+                print(f"[app] Registry indisponible pour {uri} : {e}")
+
+        # Secours : modèle local versionné (DVC).
+        if os.path.exists(LOCAL_MODEL_PATH):
+            _model = joblib.load(LOCAL_MODEL_PATH)
+            print(f"[app] Modele charge depuis le fichier local : {LOCAL_MODEL_PATH}")
+        else:
+            raise RuntimeError(
+                f"Aucun modele disponible : ni dans le Registry MLflow "
+                f"('{MODEL_NAME}'), ni en local ('{LOCAL_MODEL_PATH}'). "
+                f"Lancez d'abord l'entrainement (src/train.py) et l'evaluation "
+                f"(src/evaluate.py) pour enregistrer le modele."
+            )
     return _model
 
 

@@ -1,20 +1,39 @@
+  # ============================================================
+#  Configuration centrale du projet MLOps
+#  Remplace YOUR_BUCKET et YOUR_IP_ADRESS par tes valeurs.
+# ============================================================
+
 preprocess:
-  input : s3://m1-2026-mlops-project-group1/data/raw/data.csv
-  output : s3://m1-2026-mlops-project-group1/data/processed/data_processed.csv
+  # Données brutes (source). Peut être un chemin S3 ou local (data/raw/data.csv).
+  input: s3://m1-2026-mlops-project-group1/data/raw/data.csv
+  # Sortie des données prétraitées (poussée sur S3).
+  output: s3://m1-2026-mlops-project-group1/data/processed/data_processed.csv
+  test_size: 0.2
+  random_state: 42
 
-train : 
+train:
   data: s3://m1-2026-mlops-project-group1/data/processed/data_processed.csv
-  model_path : models/model.pkl
+  model_path: models/model.pkl
+  target_column: Outcome          # nom de la colonne cible (à adapter au dataset)
+  # Hyperparamètres du RandomForest
+  n_estimators: 200
+  max_depth: 8
+  min_samples_split: 2
 
-evaluate :
-  model_path : models/model.pkl
-  data_path : s3://m1-2026-mlops-project-group1/data/processed/data_processed.csv
+evaluate:
+  model_path: models/model.pkl
+  data_path: s3://m1-2026-mlops-project-group1/data/processed/data_processed.csv
+  target_column: Outcome
+  # Seuil minimal d'accuracy pour enregistrer le modèle dans le Registry
+  registry_threshold: 0.75
 
-aws :
-  aws_access_key_id: ASIA4NLUC36ZSSDISMRU
-  aws_secret_access_key: Rmw4RYfv0jNW+wbFYTqbC2YXCAZgN8BI2ClSdYRd
-  region_name: ap-northeast-1
+aws:
+  # Laisse vide si tu utilises `aws configure` (recommandé).
+  aws_access_key_id: ""
+  aws_secret_access_key: ""
+  region_name: "ap-northeast-1"
 
 mlflow:
   MLFLOW_TRACKING_URI: "http://52.196.234.98:5000"
   EXPERIMENT_NAME: "Student_Experiment"
+  REGISTERED_MODEL_NAME: "diabetes-classifier"
