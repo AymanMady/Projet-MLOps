@@ -61,19 +61,18 @@ def main():
 
         acc = metrics["accuracy"]
         best_prev = get_best_registered_accuracy(client, model_name)
-        threshold = p_eval["registry_threshold"]
 
-        # --- Enregistrer UNIQUEMENT le meilleur modèle ---
-        if acc >= threshold and acc >= best_prev:
+        # --- Enregistrer UNIQUEMENT le meilleur modèle (plus de seuil minimal) ---
+        if acc >= best_prev:
             model_uri = f"runs:/{run.info.run_id}/model"
             result = mlflow.register_model(model_uri, model_name)
             print(f"[evaluate] ✅ Nouveau meilleur modele enregistre : "
-                  f"{model_name} v{result.version} (acc={acc:.4f} > best={best_prev:.4f})")
-            # Optionnel : promouvoir en Production
+                  f"{model_name} v{result.version} (acc={acc:.4f} >= best={best_prev:.4f})")
+            # Promouvoir ce modele comme 'champion'
             client.set_registered_model_alias(model_name, "champion", result.version)
         else:
             print(f"[evaluate] ⏭️  Modele NON enregistre "
-                  f"(acc={acc:.4f}, seuil={threshold}, best_actuel={best_prev:.4f})")
+                  f"(acc={acc:.4f} < best_actuel={best_prev:.4f})")
 
 
 if __name__ == "__main__":

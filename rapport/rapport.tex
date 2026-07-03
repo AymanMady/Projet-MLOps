@@ -1,0 +1,241 @@
+% ============================================================================
+%  Mini-rapport --- Projet MLOps & Déploiement de modèles
+%  Master DEML (M1) --- SupNum --- Prof : Yehdhih ANNA
+%  Compilation : pdflatex rapport.tex  (2 passes pour les références)
+%
+%  >>> CAPTURES D'ECRAN <<<
+%  Deposez vos images PNG/JPG dans le dossier  rapport/images/
+%  avec EXACTEMENT les noms indiques (s1_mlflow_runs.png, etc.).
+%  Tant qu'une image est absente, un cadre gris "Emplacement capture"
+%  s'affiche a sa place. Des qu'elle est presente, elle s'insere seule.
+% ============================================================================
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{lmodern}
+\usepackage[a4paper,margin=2cm]{geometry}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, backgrounds}
+\usepackage[colorlinks=true, linkcolor=blue, urlcolor=blue, citecolor=blue]{hyperref}
+
+% ---- Couleurs
+\definecolor{brand}{HTML}{0F172A}
+\definecolor{accent}{HTML}{0369A1}
+\definecolor{soft}{HTML}{E2E8F0}
+\definecolor{ph}{HTML}{94A3B8}
+
+% ---- En-tete / pied de page
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small\textsc{Projet MLOps --- Prédiction du Diabète}}
+\rhead{\small SupNum --- DEML M1}
+\cfoot{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ---- Titres de section colorés et compacts
+\titleformat{\section}{\large\bfseries\color{accent}}{\thesection.}{0.5em}{}
+\titlespacing*{\section}{0pt}{1.1em}{0.5em}
+\titleformat{\subsection}{\normalsize\bfseries\color{brand}}{\thesubsection}{0.5em}{}
+\titlespacing*{\subsection}{0pt}{0.7em}{0.3em}
+
+\setlist{nosep, leftmargin=1.3em}
+
+% Absorbe les petits débordements de ligne (URLs, mots longs) sans marge cassée.
+\setlength{\emergencystretch}{3em}
+
+% ============================================================================
+%  Commande de CAPTURE :  \capture{fichier}{legende}{largeur(0-1)}
+%  - Si images/<fichier> existe -> l'image est incluse.
+%  - Sinon -> cadre gris avec l'instruction (ou prendre la capture).
+% ============================================================================
+\newcommand{\capture}[3]{%
+  \begin{figure}[H]
+  \centering
+  \IfFileExists{images/#1}{%
+    \fbox{\includegraphics[width=#3\linewidth]{images/#1}}%
+  }{%
+    \setlength{\fboxsep}{0pt}%
+    \fcolorbox{ph}{soft!40}{%
+      \begin{minipage}[c][3.6cm][c]{#3\linewidth}
+        \centering\color{ph}\itshape
+        \textbf{[ Emplacement capture --- \texttt{\detokenize{images/#1}} ]}\\[6pt]
+        #2
+      \end{minipage}}%
+  }
+  \caption{#2}
+  \end{figure}
+}
+
+% ============================================================================
+\begin{document}
+
+% ------------------------------------------------------------------ TITRE
+\begin{center}
+  {\LARGE\bfseries\color{brand} Prédiction du Diabète --- Pipeline MLOps de bout en bout}\\[4pt]
+  {\large Module : MLOps et Déploiement de modèles}\\[2pt]
+  {\normalsize Institut Supérieur du Numérique --- SupNum \quad$\cdot$\quad Master DEML (M1) --- 2026}\\[6pt]
+  {\normalsize Enseignant : Yehdhih ANNA \quad$\cdot$\quad Date : 3 juillet 2026}\\[8pt]
+  \begin{tabular}{l}
+    \textbf{Groupe 1 :} Bechir Mady (22014) \quad$\cdot$\quad Abdarahman Abdarahman (22053) \quad$\cdot$\quad Aly Wedad (22086)
+  \end{tabular}
+\end{center}
+\vspace{0.4em}
+\hrule
+\vspace{0.8em}
+
+% ------------------------------------------------------------------ LIENS
+\section{Liens d'accès}
+\begin{itemize}
+  \item \textbf{Repository GitHub :} \url{https://github.com/AymanMady/Projet-MLOps}
+  \item \textbf{Serveur MLflow (Tracking + Registry, EC2 \#1) :} \url{http://54.95.120.104:5000}
+  \item \textbf{Application Flask (EC2 \#2) :} \url{http://54.95.120.104:5001} \quad{\small\color{ph}}
+  \item \textbf{Stockage S3 :} bucket \texttt{m1-2026-mlops-project-group1} (données brutes / prétraitées, cache DVC, artefacts).
+\end{itemize}
+
+% ------------------------------------------------------------------ PROBLEME ML
+\section{Présentation du problème ML et du dataset}
+\subsection*{Problème traité}
+Il s'agit d'un problème de \textbf{classification binaire supervisée} en santé : prédire si un
+patient est \emph{diabétique} (\texttt{Outcome = 1}) ou \emph{non diabétique} (\texttt{Outcome = 0})
+à partir de mesures cliniques simples. L'objectif applicatif est un outil d'aide au dépistage
+précoce, exposé via une interface web où un utilisateur saisit les mesures d'un patient et obtient
+une prédiction immédiate.
+
+\subsection*{Jeu de données}
+Nous utilisons le dataset \textbf{Pima Indians Diabetes} (\textasciitilde768 observations, 8 variables
+explicatives numériques + 1 cible). Les données brutes sont versionnées avec DVC et stockées sur S3.
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Variable} & \textbf{Description} & \textbf{Type} \\ \midrule
+Pregnancies & Nombre de grossesses & entier \\
+Glucose & Glycémie (test de tolérance) & numérique \\
+BloodPressure & Pression artérielle diastolique (mm Hg) & numérique \\
+SkinThickness & Épaisseur du pli cutané tricipital (mm) & numérique \\
+Insulin & Insuline sérique (mu U/ml) & numérique \\
+BMI & Indice de masse corporelle & numérique \\
+DiabetesPedigreeFunction & Antécédents familiaux (score) & numérique \\
+Age & Âge (années) & entier \\ \midrule
+\textbf{Outcome} & \textbf{Cible : 1 = diabétique, 0 = non} & \textbf{binaire} \\ \bottomrule
+\end{tabular}
+\caption{Variables du dataset Pima Indians Diabetes.}
+\end{table}
+
+\noindent\textbf{Modèle \& métriques.} Nous entraînons un \texttt{RandomForestClassifier}
+(scikit-learn ; \texttt{n\_estimators=200}, \texttt{max\_depth=8}). Les données sont nettoyées
+(suppression des doublons, imputation médiane) puis mises à l'échelle (\texttt{StandardScaler}).
+Les performances sont suivies via l'\textbf{accuracy}, le \textbf{F1-score}, la \textbf{précision}
+et le \textbf{rappel}, tous logués dans MLflow.
+
+% ------------------------------------------------------------------ ARCHITECTURE
+\section{Architecture technique mise en place}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  font=\small,
+  box/.style={rectangle, rounded corners, draw=accent, thick, fill=soft!45,
+              align=center, minimum height=1.5cm, minimum width=3.2cm, inner sep=5pt},
+  s3/.style={cylinder, shape border rotate=90, aspect=0.25, draw=accent, thick,
+             fill=accent!12, align=center, minimum height=2cm, minimum width=3cm},
+  arr/.style={-{Stealth[length=3mm]}, thick, accent},
+  lbl/.style={font=\scriptsize\itshape, text=brand}
+]
+  % Noeuds
+  \node[box] (pc) {\textbf{PC local}\\ scripts \texttt{src/}\\ DVC + \texttt{params.yaml}};
+  \node[s3, right=2.6cm of pc] (s3) {\textbf{Amazon S3}\\ \scriptsize raw / processed\\ \scriptsize dvcstore + artefacts};
+  \node[box, above right=0.3cm and 2.6cm of s3] (ec1) {\textbf{EC2 \#1 --- MLflow}\\ Tracking (:5000)\\ Model Registry};
+  \node[box, below right=0.3cm and 2.6cm of s3] (ec2) {\textbf{EC2 \#2 --- Flask}\\ App web (:5001)\\ formulaire + prédiction};
+
+  % Fleches
+  \draw[arr] (pc) -- node[lbl, above]{données} node[lbl,below]{DVC push/pull} (s3);
+  \draw[arr] (s3) -- node[lbl, above, sloped]{artefacts} (ec1);
+  \draw[arr] (pc.north) to[out=60,in=180] node[lbl, above]{log params / métriques / modèle} (ec1.west);
+  \draw[arr] (ec1) -- node[lbl, right, align=left]{modèle\\ \og champion \fg} (ec2);
+  \draw[arr] (s3) -- node[lbl, below, sloped]{secours} (ec2);
+\end{tikzpicture}
+\caption{Architecture : le poste local orchestre le pipeline, S3 centralise les données/artefacts,
+EC2\#1 héberge MLflow (tracking + registry) et EC2\#2 sert le modèle via Flask.}
+\end{figure}
+
+\noindent\textbf{Rôle de chaque composant :}
+\begin{itemize}
+  \item \textbf{PC local} --- exécute les scripts (\texttt{preprocess} $\rightarrow$ \texttt{train}
+        $\rightarrow$ \texttt{evaluate}), pilote DVC et logue vers MLflow.
+  \item \textbf{Amazon S3} (\texttt{m1-2026-mlops-project-group1}) --- dépôt partagé : données brutes,
+        données prétraitées, \emph{remote} DVC (\texttt{dvcstore}) et artefacts/modèles MLflow.
+  \item \textbf{EC2 \#1 --- MLflow} --- serveur de \emph{tracking} des expériences et \emph{Model Registry}
+        (gestion des versions + alias \og champion \fg).
+  \item \textbf{EC2 \#2 --- Flask} --- application web qui charge le modèle \og champion \fg{} du
+        Model Registry et renvoie la prédiction ; repli sur le modèle local si le Registry est
+        indisponible.
+\end{itemize}
+
+% ------------------------------------------------------------------ PIPELINE ML + MLFLOW
+\section{Pipeline ML et suivi des expériences (MLflow)}
+Trois scripts, intégrés à MLflow dès le départ :
+\begin{enumerate}
+  \item \texttt{src/preprocess.py} --- nettoyage, imputation médiane, \texttt{StandardScaler} ;
+        écrit les données prétraitées sur S3.
+  \item \texttt{src/train.py} --- entraîne le RandomForest, logue les \textbf{hyperparamètres} et les
+        \textbf{métriques} (accuracy, F1), et enregistre le modèle comme artefact.
+  \item \texttt{src/evaluate.py} --- évalue (accuracy, F1, précision, rappel) et \textbf{n'enregistre
+        que le meilleur modèle} dans le Registry (si accuracy $\geq$ seuil \emph{et} $\geq$ meilleure
+        version existante), puis lui affecte l'alias \og champion \fg.
+\end{enumerate}
+
+\capture{s1_mlflow_runs.png}{MLflow --- liste des runs de l'expérience \og Student\_Experiment \fg{} (preprocess, train, evaluate).}{0.95}
+
+\capture{s2_mlflow_run_detail.png}{MLflow --- détail d'un run : hyperparamètres (n\_estimators, max\_depth\dots{}) et métriques (accuracy, F1, précision, rappel).}{0.95}
+
+\capture{s3_mlflow_registry.png}{MLflow --- Model Registry : modèle \og diabetes-classifier \fg{}, ses versions et l'alias \og champion \fg{}.}{0.95}
+
+% ------------------------------------------------------------------ DVC + S3
+\section{Données \& reproductibilité (DVC + S3)}
+Les données sont versionnées avec \textbf{DVC}, en utilisant S3 comme \emph{remote storage}
+(dossier \texttt{dvcstore} du bucket).
+
+\capture{s4_dvc_terminal.png}{DVC --- terminal montrant \texttt{dvc status} / \texttt{dvc push} (ou \texttt{dvc dag}) et le versioning des données.}{0.9}
+
+\capture{s5_s3_bucket.png}{Console AWS S3 --- bucket \og m1-2026-mlops-project-group1 \fg{} avec les dossiers data/raw, data/processed et dvcstore.}{0.9}
+
+
+
+% ------------------------------------------------------------------ DEPLOIEMENT
+\section{Déploiement --- Application Flask}
+L'application \texttt{app/app.py} expose un formulaire (les 8 features cliniques). À la soumission,
+elle charge le modèle \og champion \fg\ depuis le Model Registry MLflow, effectue la prédiction et
+affiche le résultat (\og Diabétique \fg{} / \og Non diabétique \fg{}). Elle est déployée sur une seconde
+instance EC2 (port 5001).
+
+\begin{minipage}[t]{0.47\linewidth}
+\capture{s7_flask_form.png}{Interface Flask --- formulaire de saisie des mesures.}{1.0}
+\end{minipage}\hfill\begin{minipage}[t]{0.47\linewidth}
+\capture{s8_flask_result.png}{Interface Flask --- résultat de la prédiction affiché.}{1.0}
+\end{minipage}
+
+% ------------------------------------------------------------------ GIT
+\section{Collaboration \& historique Git}
+Le dépôt suit un modèle multi-branches : chaque membre dispose d'une branche personnelle
+(\texttt{bechir-22014}, \texttt{abdrahman}, \texttt{aliy-22086}) fusionnée dans \texttt{main} via des
+\emph{Pull Requests}, produisant un arbre Git non linéaire avec plusieurs \emph{merges}.
+
+\capture{s9_git_graph.png}{Graphe Git (GitHub Network ou \og git log --graph \fg{}) montrant les branches par membre et les merges.}{0.9}
+
+\vfill
+\begin{center}\small\color{ph}
+Rapport projet MLOps --- Groupe 1 --- SupNum DEML M1.
+\end{center}
+
+\end{document}

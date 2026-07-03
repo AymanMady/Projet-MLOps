@@ -2,5 +2,3 @@
     remote = dvcstore
 ['remote "dvcstore"']
     url = s3://m1-2026-mlops-project-group1/dvcstore
-    access_key_id = ASIA4NLUC36ZSSDISMRU
-    secret_access_key = Rmw4RYfv0jNW+wbFYTqbC2YXCAZgN8BI2ClSdYRd
